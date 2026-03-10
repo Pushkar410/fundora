@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { db } from "../firebase";
 import { doc, getDoc, updateDoc, addDoc, collection } from "firebase/firestore";
+import { uploadImage } from "../utils/uploadImage";
 
 function Fundraiser() {
     const { id } = useParams();
 
     const [fundraiser, setFundraiser] = useState(null);
     const [amount, setAmount] = useState("");
+    const [image, setImage] = useState(null);
 
     const loadFundraiser = async () => {
         const ref = doc(db, "fundraisers", id);
@@ -31,14 +33,12 @@ function Fundraiser() {
         const donationAmount = Number(amount);
 
         try {
-            // Save donation record
             await addDoc(collection(db, "donations"), {
                 fundraiser_id: id,
                 amount: donationAmount,
                 created_at: new Date()
             });
 
-            // Update fundraiser total
             const fundraiserRef = doc(db, "fundraisers", id);
 
             const newTotal =
@@ -51,8 +51,29 @@ function Fundraiser() {
             alert("Donation successful!");
 
             setAmount("");
-
             loadFundraiser();
+
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const uploadProof = async () => {
+        if (!image) {
+            alert("Select image first");
+            return;
+        }
+
+        try {
+            const imageUrl = await uploadImage(image);
+
+            await addDoc(collection(db, "progress_updates"), {
+                fundraiser_id: id,
+                proof_url: imageUrl,
+                created_at: new Date()
+            });
+
+            alert("Proof uploaded successfully!");
 
         } catch (err) {
             console.error(err);
@@ -88,8 +109,21 @@ function Fundraiser() {
 
             <br /><br />
 
-            <button onClick={donate}>
-                Donate
+            <button onClick={donate}>Donate</button>
+
+            <hr />
+
+            <h3>Upload Progress Proof</h3>
+
+            <input
+                type="file"
+                onChange={(e) => setImage(e.target.files[0])}
+            />
+
+            <br /><br />
+
+            <button onClick={uploadProof}>
+                Upload Proof
             </button>
         </div>
     );

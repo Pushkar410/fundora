@@ -19,6 +19,20 @@ function FundraiserCard({ fundraiser }) {
                 width: "420px"
             }}
         >
+
+            {/* IMAGE */}
+            {fundraiser.image_url && (
+                <img
+                    src={fundraiser.image_url}
+                    alt="fundraiser"
+                    style={{
+                        width: "100%",
+                        borderRadius: "8px",
+                        marginBottom: "10px"
+                    }}
+                />
+            )}
+
             <Link to={`/fundraiser/${fundraiser.id}`}>
                 <h2>{fundraiser.name}</h2>
             </Link>
@@ -28,7 +42,7 @@ function FundraiserCard({ fundraiser }) {
             <p><b>Goal:</b> ₹{goal}</p>
             <p><b>Raised:</b> ₹{raised}</p>
 
-            {/* progress bar container */}
+            {/* Progress bar */}
             <div
                 style={{
                     background: "#ddd",
@@ -37,7 +51,6 @@ function FundraiserCard({ fundraiser }) {
                     width: "100%"
                 }}
             >
-                {/* progress */}
                 <div
                     style={{
                         width: progressWidth,
