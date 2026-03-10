@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { db } from "../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, addDoc, collection } from "firebase/firestore";
 
 function Fundraiser() {
     const { id } = useParams();
+
     const [fundraiser, setFundraiser] = useState(null);
+    const [amount, setAmount] = useState("");
 
     const loadFundraiser = async () => {
-        const docRef = doc(db, "fundraisers", id);
-        const docSnap = await getDoc(docRef);
+        const ref = doc(db, "fundraisers", id);
+        const snap = await getDoc(ref);
 
-        if (docSnap.exists()) {
-            setFundraiser(docSnap.data());
+        if (snap.exists()) {
+            setFundraiser({ id: snap.id, ...snap.data() });
         }
     };
 
@@ -20,19 +22,75 @@ function Fundraiser() {
         loadFundraiser();
     }, []);
 
+    const donate = async () => {
+        if (!amount || amount <= 0) {
+            alert("Enter valid amount");
+            return;
+        }
+
+        const donationAmount = Number(amount);
+
+        try {
+            // Save donation record
+            await addDoc(collection(db, "donations"), {
+                fundraiser_id: id,
+                amount: donationAmount,
+                created_at: new Date()
+            });
+
+            // Update fundraiser total
+            const fundraiserRef = doc(db, "fundraisers", id);
+
+            const newTotal =
+                (fundraiser.total_raised || 0) + donationAmount;
+
+            await updateDoc(fundraiserRef, {
+                total_raised: newTotal
+            });
+
+            alert("Donation successful!");
+
+            setAmount("");
+
+            loadFundraiser();
+
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     if (!fundraiser) return <p>Loading...</p>;
 
     return (
-        <div>
+        <div style={{ maxWidth: "500px" }}>
             <h1>{fundraiser.name}</h1>
 
             <p>{fundraiser.story}</p>
 
-            <h3>Goal: ₹{fundraiser.goal}</h3>
+            <p>
+                <b>Goal:</b> ₹{fundraiser.goal}
+            </p>
 
-            <h3>Raised: ₹{fundraiser.total_raised}</h3>
+            <p>
+                <b>Raised:</b> ₹{fundraiser.total_raised || 0}
+            </p>
 
-            <button>Donate</button>
+            <hr />
+
+            <h3>Donate</h3>
+
+            <input
+                type="number"
+                placeholder="Enter amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+            />
+
+            <br /><br />
+
+            <button onClick={donate}>
+                Donate
+            </button>
         </div>
     );
 }
