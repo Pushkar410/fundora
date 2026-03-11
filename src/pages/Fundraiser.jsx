@@ -98,6 +98,41 @@ function Fundraiser() {
 
             <hr />
 
+            {/* TRUST SCORE */}
+
+            <h3>Trust Score</h3>
+
+            <div
+                style={{
+                    border: "1px solid #ddd",
+                    padding: "15px",
+                    borderRadius: "8px",
+                    marginBottom: "20px"
+                }}
+            >
+
+                <p>
+                    <b>Final Score:</b> {fundraiser.final_score || 0} / 10
+                </p>
+
+                <p>
+                    AI Verification: {fundraiser.ai_score > 0 ? "✔ Verified" : "Pending"}
+                </p>
+
+                <p>
+                    Community Confirmation: {fundraiser.community_score > 0 ? "✔ Verified" : "Pending"}
+                </p>
+
+                <p>
+                    Document Verification: {fundraiser.doc_score > 0 ? "✔ Verified" : "Pending"}
+                </p>
+
+            </div>
+
+            <hr />
+
+            {/* DONATION */}
+
             <h3>Donate</h3>
 
             <input
@@ -109,9 +144,13 @@ function Fundraiser() {
 
             <br /><br />
 
-            <button onClick={donate}>Donate</button>
+            <button onClick={donate}>
+                Donate
+            </button>
 
             <hr />
+
+            {/* PROOF UPLOAD */}
 
             <h3>Upload Progress Proof</h3>
 
@@ -125,6 +164,7 @@ function Fundraiser() {
             <button onClick={uploadProof}>
                 Upload Proof
             </button>
+
         </div>
     );
 }
