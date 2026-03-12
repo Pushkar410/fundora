@@ -1,29 +1,72 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { db } from "../firebase";
-import { doc, getDoc, updateDoc, addDoc, collection } from "firebase/firestore";
+import {
+    doc,
+    getDoc,
+    updateDoc,
+    addDoc,
+    collection,
+    query,
+    where,
+    getDocs
+} from "firebase/firestore";
+
 import { uploadImage } from "../utils/uploadImage";
 
 function Fundraiser() {
     const { id } = useParams();
-
+    const currentUser = localStorage.getItem("user_phone");
     const [fundraiser, setFundraiser] = useState(null);
+    const [updates, setUpdates] = useState([]);
     const [amount, setAmount] = useState("");
     const [image, setImage] = useState(null);
 
+    // Load fundraiser
     const loadFundraiser = async () => {
-        const ref = doc(db, "fundraisers", id);
-        const snap = await getDoc(ref);
+        try {
+            const ref = doc(db, "fundraisers", id);
+            const snap = await getDoc(ref);
 
-        if (snap.exists()) {
-            setFundraiser({ id: snap.id, ...snap.data() });
+            if (snap.exists()) {
+                setFundraiser({ id: snap.id, ...snap.data() });
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    // Load progress updates
+    const loadUpdates = async () => {
+        try {
+            const q = query(
+                collection(db, "progress_updates"),
+                where("fundraiser_id", "==", id)
+            );
+
+            const snapshot = await getDocs(q);
+
+            const list = [];
+
+            snapshot.forEach((doc) => {
+                list.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+
+            setUpdates(list);
+        } catch (err) {
+            console.error(err);
         }
     };
 
     useEffect(() => {
         loadFundraiser();
+        loadUpdates();
     }, []);
 
+    // Donation function
     const donate = async () => {
         if (!amount || amount <= 0) {
             alert("Enter valid amount");
@@ -48,7 +91,7 @@ function Fundraiser() {
                 total_raised: newTotal
             });
 
-            alert("Donation successful!");
+            alert("Donation successful");
 
             setAmount("");
             loadFundraiser();
@@ -58,6 +101,7 @@ function Fundraiser() {
         }
     };
 
+    // Upload progress proof
     const uploadProof = async () => {
         if (!image) {
             alert("Select image first");
@@ -73,7 +117,10 @@ function Fundraiser() {
                 created_at: new Date()
             });
 
-            alert("Proof uploaded successfully!");
+            alert("Proof uploaded successfully");
+
+            setImage(null);
+            loadUpdates();
 
         } catch (err) {
             console.error(err);
@@ -83,18 +130,15 @@ function Fundraiser() {
     if (!fundraiser) return <p>Loading...</p>;
 
     return (
-        <div style={{ maxWidth: "500px" }}>
+        <div style={{ maxWidth: "600px", margin: "auto" }}>
+
             <h1>{fundraiser.name}</h1>
 
             <p>{fundraiser.story}</p>
 
-            <p>
-                <b>Goal:</b> ₹{fundraiser.goal}
-            </p>
+            <p><b>Goal:</b> ₹{fundraiser.goal}</p>
 
-            <p>
-                <b>Raised:</b> ₹{fundraiser.total_raised || 0}
-            </p>
+            <p><b>Raised:</b> ₹{fundraiser.total_raised || 0}</p>
 
             <hr />
 
@@ -111,27 +155,28 @@ function Fundraiser() {
                 }}
             >
 
+                <p><b>Final Score:</b> {fundraiser.final_score || 0} / 10</p>
+
                 <p>
-                    <b>Final Score:</b> {fundraiser.final_score || 0} / 10
+                    AI Verification:
+                    {fundraiser.ai_score > 0 ? " ✔ Verified" : " Pending"}
                 </p>
 
                 <p>
-                    AI Verification: {fundraiser.ai_score > 0 ? "✔ Verified" : "Pending"}
+                    Community Confirmation:
+                    {fundraiser.community_score > 0 ? " ✔ Verified" : " Pending"}
                 </p>
 
                 <p>
-                    Community Confirmation: {fundraiser.community_score > 0 ? "✔ Verified" : "Pending"}
-                </p>
-
-                <p>
-                    Document Verification: {fundraiser.doc_score > 0 ? "✔ Verified" : "Pending"}
+                    Document Verification:
+                    {fundraiser.doc_score > 0 ? " ✔ Verified" : " Pending"}
                 </p>
 
             </div>
 
             <hr />
 
-            {/* DONATION */}
+            {/* DONATE */}
 
             <h3>Donate</h3>
 
@@ -144,26 +189,72 @@ function Fundraiser() {
 
             <br /><br />
 
-            <button onClick={donate}>
-                Donate
-            </button>
+            <button onClick={donate}>Donate</button>
 
             <hr />
 
-            {/* PROOF UPLOAD */}
+            {/* UPLOAD PROOF */}
 
-            <h3>Upload Progress Proof</h3>
 
-            <input
-                type="file"
-                onChange={(e) => setImage(e.target.files[0])}
-            />
+            {currentUser === fundraiser.created_by && (
+                <>
+                    <hr />
 
+                    <h3>Upload Progress Proof</h3>
+
+                    <input
+                        type="file"
+                        onChange={(e) => setImage(e.target.files[0])}
+                    />
+
+                    <br /><br />
+
+                    <button onClick={uploadProof}>
+                        Upload Proof
+                    </button>
+                </>
+            )}
             <br /><br />
 
             <button onClick={uploadProof}>
                 Upload Proof
             </button>
+
+            <hr />
+
+            {/* PROGRESS TIMELINE */}
+
+            <h3>Progress Updates</h3>
+
+            {updates.length === 0 && <p>No updates yet</p>}
+
+            {updates.map((u) => (
+                <div
+                    key={u.id}
+                    style={{
+                        border: "1px solid #ddd",
+                        padding: "10px",
+                        marginBottom: "10px",
+                        borderRadius: "8px"
+                    }}
+                >
+
+                    {u.proof_url && (
+                        <img
+                            src={u.proof_url}
+                            alt="proof"
+                            style={{
+                                width: "100%",
+                                borderRadius: "6px",
+                                marginBottom: "10px"
+                            }}
+                        />
+                    )}
+
+                    <p>Update uploaded</p>
+
+                </div>
+            ))}
 
         </div>
     );

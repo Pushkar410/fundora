@@ -2,13 +2,11 @@ import { Link } from "react-router-dom";
 
 function FundraiserCard({ fundraiser }) {
 
-    const raised = fundraiser.total_raised ?? 0;
-    const goal = fundraiser.goal ?? 1;
+    const raised = fundraiser.total_raised || 0;
+    const goal = fundraiser.goal || 1;
 
-    const progress = (raised / goal) * 100;
-
-    const progressWidth = progress === 0 ? "2%" : `${progress}%`;
-
+    const progress = Math.min((raised / goal) * 100, 100);
+    const progressWidth = (raised / goal) * 100;
     return (
         <div
             style={{
@@ -47,13 +45,12 @@ function FundraiserCard({ fundraiser }) {
                 style={{
                     background: "#ddd",
                     height: "10px",
-                    borderRadius: "5px",
-                    width: "100%"
+                    borderRadius: "5px"
                 }}
             >
                 <div
                     style={{
-                        width: progressWidth,
+                        width: `${progress}%`,
                         background: "green",
                         height: "100%",
                         borderRadius: "5px"
@@ -61,7 +58,7 @@ function FundraiserCard({ fundraiser }) {
                 />
             </div>
 
-            <p>{Math.round(progress)}% funded</p>
+            <p>{Math.round(progressWidth)}% funded</p>
 
         </div>
     );
