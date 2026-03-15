@@ -11,17 +11,21 @@ import {
     where,
     getDocs
 } from "firebase/firestore";
-
+import { calculateTrustScore } from "../utils/trustScore";
 import { uploadImage } from "../utils/uploadImage";
 
-function Fundraiser() {
+async function Fundraiser() {
     const { id } = useParams();
     const currentUser = localStorage.getItem("user_phone");
     const [fundraiser, setFundraiser] = useState(null);
     const [updates, setUpdates] = useState([]);
     const [amount, setAmount] = useState("");
     const [image, setImage] = useState(null);
+    const newScore = calculateTrustScore(fundraiser);
 
+    await updateDoc(fundraiserRef, {
+        final_score: newScore
+    });
     // Load fundraiser
     const loadFundraiser = async () => {
         try {
@@ -216,9 +220,6 @@ function Fundraiser() {
             )}
             <br /><br />
 
-            <button onClick={uploadProof}>
-                Upload Proof
-            </button>
 
             <hr />
 

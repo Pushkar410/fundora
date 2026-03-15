@@ -60,6 +60,7 @@ function FundraiserCard({ fundraiser }) {
 
             <p>{Math.round(progressWidth)}% funded</p>
 
+
         </div>
     );
 }
