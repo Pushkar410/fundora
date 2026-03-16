@@ -11,58 +11,54 @@ import {
     where,
     getDocs
 } from "firebase/firestore";
+
 import { calculateTrustScore } from "../utils/trustScore";
 import { uploadImage } from "../utils/uploadImage";
+import { checkPromotionEligibility } from "../utils/promotionCheck";
 
-async function Fundraiser() {
+function Fundraiser() {
+
     const { id } = useParams();
     const currentUser = localStorage.getItem("user_phone");
+
     const [fundraiser, setFundraiser] = useState(null);
     const [updates, setUpdates] = useState([]);
     const [amount, setAmount] = useState("");
     const [image, setImage] = useState(null);
-    const newScore = calculateTrustScore(fundraiser);
 
-    await updateDoc(fundraiserRef, {
-        final_score: newScore
-    });
     // Load fundraiser
     const loadFundraiser = async () => {
-        try {
-            const ref = doc(db, "fundraisers", id);
-            const snap = await getDoc(ref);
 
-            if (snap.exists()) {
-                setFundraiser({ id: snap.id, ...snap.data() });
-            }
-        } catch (err) {
-            console.error(err);
+        const ref = doc(db, "fundraisers", id);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+            setFundraiser({ id: snap.id, ...snap.data() });
         }
+
     };
 
-    // Load progress updates
+    // Load updates
     const loadUpdates = async () => {
-        try {
-            const q = query(
-                collection(db, "progress_updates"),
-                where("fundraiser_id", "==", id)
-            );
 
-            const snapshot = await getDocs(q);
+        const q = query(
+            collection(db, "progress_updates"),
+            where("fundraiser_id", "==", id)
+        );
 
-            const list = [];
+        const snapshot = await getDocs(q);
 
-            snapshot.forEach((doc) => {
-                list.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
+        const list = [];
+
+        snapshot.forEach((doc) => {
+            list.push({
+                id: doc.id,
+                ...doc.data()
             });
+        });
 
-            setUpdates(list);
-        } catch (err) {
-            console.error(err);
-        }
+        setUpdates(list);
+
     };
 
     useEffect(() => {
@@ -70,8 +66,37 @@ async function Fundraiser() {
         loadUpdates();
     }, []);
 
-    // Donation function
+    // Update trust score and promotion
+    useEffect(() => {
+
+        if (!fundraiser) return;
+
+        const updateScores = async () => {
+
+            const fundraiserRef = doc(db, "fundraisers", id);
+
+            const score = calculateTrustScore(fundraiser);
+
+            const promotion = checkPromotionEligibility({
+                ...fundraiser,
+                final_score: score
+            });
+
+            await updateDoc(fundraiserRef, {
+                final_score: score,
+                promotion_ready: promotion.eligible,
+                promotion_reason: promotion.reason
+            });
+
+        };
+
+        updateScores();
+
+    }, [fundraiser]);
+
+    // Donation
     const donate = async () => {
+
         if (!amount || amount <= 0) {
             alert("Enter valid amount");
             return;
@@ -79,59 +104,64 @@ async function Fundraiser() {
 
         const donationAmount = Number(amount);
 
-        try {
-            await addDoc(collection(db, "donations"), {
-                fundraiser_id: id,
-                amount: donationAmount,
-                created_at: new Date()
-            });
+        await addDoc(collection(db, "donations"), {
+            fundraiser_id: id,
+            amount: donationAmount,
+            created_at: new Date()
+        });
 
-            const fundraiserRef = doc(db, "fundraisers", id);
+        const fundraiserRef = doc(db, "fundraisers", id);
 
-            const newTotal =
-                (fundraiser.total_raised || 0) + donationAmount;
+        const newTotal = (fundraiser.total_raised || 0) + donationAmount;
 
-            await updateDoc(fundraiserRef, {
-                total_raised: newTotal
-            });
+        await updateDoc(fundraiserRef, {
+            total_raised: newTotal
+        });
 
-            alert("Donation successful");
+        setAmount("");
+        loadFundraiser();
 
-            setAmount("");
-            loadFundraiser();
-
-        } catch (err) {
-            console.error(err);
-        }
     };
 
-    // Upload progress proof
+    // Upload proof
     const uploadProof = async () => {
+
         if (!image) {
             alert("Select image first");
             return;
         }
 
-        try {
-            const imageUrl = await uploadImage(image);
+        const imageUrl = await uploadImage(image);
 
-            await addDoc(collection(db, "progress_updates"), {
-                fundraiser_id: id,
-                proof_url: imageUrl,
-                created_at: new Date()
-            });
+        await addDoc(collection(db, "progress_updates"), {
+            fundraiser_id: id,
+            proof_url: imageUrl,
+            created_at: new Date()
+        });
 
-            alert("Proof uploaded successfully");
+        setImage(null);
+        loadUpdates();
 
-            setImage(null);
-            loadUpdates();
-
-        } catch (err) {
-            console.error(err);
-        }
     };
 
     if (!fundraiser) return <p>Loading...</p>;
+
+    // Countdown logic (after fundraiser is loaded)
+    const startDate = fundraiser.campaign_start_date
+        ? fundraiser.campaign_start_date.toDate()
+        : new Date();
+
+    const campaignDays = 30;
+
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + campaignDays);
+
+    const today = new Date();
+
+    const daysLeft = Math.max(
+        Math.ceil((endDate - today) / (1000 * 60 * 60 * 24)),
+        0
+    );
 
     return (
         <div style={{ maxWidth: "600px", margin: "auto" }}>
@@ -144,61 +174,28 @@ async function Fundraiser() {
 
             <p><b>Raised:</b> ₹{fundraiser.total_raised || 0}</p>
 
-            <hr />
+            <p><b>{daysLeft}</b> days left</p>
 
-            {/* TRUST SCORE */}
+            <hr />
 
             <h3>Trust Score</h3>
 
-            <div
-                style={{
-                    border: "1px solid #ddd",
-                    padding: "15px",
-                    borderRadius: "8px",
-                    marginBottom: "20px"
-                }}
-            >
-
-                <p><b>Final Score:</b> {fundraiser.final_score || 0} / 10</p>
-
-                <p>
-                    AI Verification:
-                    {fundraiser.ai_score > 0 ? " ✔ Verified" : " Pending"}
-                </p>
-
-                <p>
-                    Community Confirmation:
-                    {fundraiser.community_score > 0 ? " ✔ Verified" : " Pending"}
-                </p>
-
-                <p>
-                    Document Verification:
-                    {fundraiser.doc_score > 0 ? " ✔ Verified" : " Pending"}
-                </p>
-
-            </div>
+            <p><b>Final Score:</b> {fundraiser.final_score || 0}/10</p>
 
             <hr />
-
-            {/* DONATE */}
 
             <h3>Donate</h3>
 
             <input
                 type="number"
-                placeholder="Enter amount"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                placeholder="Enter amount"
             />
 
             <br /><br />
 
             <button onClick={donate}>Donate</button>
-
-            <hr />
-
-            {/* UPLOAD PROOF */}
-
 
             {currentUser === fundraiser.created_by && (
                 <>
@@ -218,47 +215,30 @@ async function Fundraiser() {
                     </button>
                 </>
             )}
-            <br /><br />
-
 
             <hr />
-
-            {/* PROGRESS TIMELINE */}
 
             <h3>Progress Updates</h3>
 
             {updates.length === 0 && <p>No updates yet</p>}
 
             {updates.map((u) => (
-                <div
-                    key={u.id}
-                    style={{
-                        border: "1px solid #ddd",
-                        padding: "10px",
-                        marginBottom: "10px",
-                        borderRadius: "8px"
-                    }}
-                >
+                <div key={u.id} style={{ marginBottom: "15px" }}>
 
                     {u.proof_url && (
                         <img
                             src={u.proof_url}
                             alt="proof"
-                            style={{
-                                width: "100%",
-                                borderRadius: "6px",
-                                marginBottom: "10px"
-                            }}
+                            style={{ width: "100%", borderRadius: "6px" }}
                         />
                     )}
-
-                    <p>Update uploaded</p>
 
                 </div>
             ))}
 
         </div>
     );
+
 }
 
 export default Fundraiser;
